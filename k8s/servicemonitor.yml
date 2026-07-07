@@ -5,6 +5,10 @@ metadata:
   namespace: monitoring
   labels:
     app: airdata-particulate
+    # kube-prometheus-stack's Prometheus resource has serviceMonitorSelector
+    # matchLabels: release=monitoring. Without this label the SM is ignored
+    # and prometheus never scrapes the exporter.
+    release: monitoring
 spec:
   selector:
     matchLabels:
