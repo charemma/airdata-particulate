@@ -27,6 +27,12 @@ spec:
           operator: Equal
           value: home
           effect: NoSchedule
+      # hostNetwork so the exporter binds directly on the node's :8000 and can
+      # be scraped from the vps without going through the flannel VXLAN overlay
+      # (which currently drops packets on the tailscale transport due to a
+      # 1450 vs 1280 MTU mismatch).
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: exporter
           image: ghcr.io/charemma/particulate:latest
