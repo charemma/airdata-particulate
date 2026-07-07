@@ -27,6 +27,11 @@ jobs:
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Ubuntu runners ship a v1 /etc/containers/registries.conf; the
+          # nixpkgs skopeo requires v2. Overwrite with a minimal v2 config.
+          sudo tee /etc/containers/registries.conf > /dev/null <<EOF
+          unqualified-search-registries = ["docker.io"]
+          EOF
           nix run nixpkgs#skopeo -- copy \
             --dest-username "$GHCR_USER" \
             --dest-password "$GHCR_TOKEN" \
