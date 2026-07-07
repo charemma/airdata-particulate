@@ -21,6 +21,12 @@ spec:
         # misapplying to an amd64 node would fail at container start.
         sensor-type: particulate
         kubernetes.io/arch: arm64
+      # aiagent has taint dedicated=home:NoSchedule so only sensor pods land there.
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: home
+          effect: NoSchedule
       containers:
         - name: exporter
           image: ghcr.io/charemma/airdata-particulate:latest
