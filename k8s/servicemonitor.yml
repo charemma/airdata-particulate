@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: airdata-particulate
+  namespace: monitoring
+  labels:
+    app: airdata-particulate
+spec:
+  selector:
+    matchLabels:
+      app: airdata-particulate
+  endpoints:
+    - port: metrics
+      interval: 60s
+      path: /metrics
