@@ -64,6 +64,25 @@ nix build .#default
 ./result/bin/particulate    # exposes :8000/metrics; expects sensor on /dev/ttyUSB0
 ```
 
+## Runtime flags
+
+Nothing is hardcoded. Pass whatever fits the host:
+
+| flag | default | notes |
+|--|--|--|
+| `-device` | `/dev/ttyUSB0` | serial port the SDS011 hangs on |
+| `-addr` | `:8000` | HTTP listen address |
+| `-warmup` | `30s` | time after wake before first query (Go duration syntax) |
+| `-interval` | `5m` | idle time between measurement cycles |
+
+Example:
+
+```bash
+particulate -device /dev/ttyUSB1 -addr :9100 -interval 2m
+```
+
+The container image inherits these defaults; override via `args:` in the Deployment.
+
 Container image (arm64):
 
 ```bash

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"net/http"
 	"time"
@@ -22,9 +23,17 @@ var (
 )
 
 func main() {
-	sensor, err := sds011.New("/dev/ttyUSB0")
+	device := flag.String("device", "/dev/ttyUSB0", "Serial device the SDS011 is attached to")
+	addr := flag.String("addr", ":8000", "HTTP listen address for the metrics endpoint")
+	warmup := flag.Duration("warmup", 30*time.Second, "Time to wait after wake before querying the sensor")
+	interval := flag.Duration("interval", 5*time.Minute, "Idle time between measurement cycles")
+	flag.Parse()
+
+	prometheus.MustRegister(pm25Gauge, pm10Gauge)
+
+	sensor, err := sds011.New(*device)
 	if err != nil {
-		log.Fatalf("failed to open port: %v", err)
+		log.Fatalf("failed to open %s: %v", *device, err)
 	}
 	defer sensor.Close()
 
@@ -35,13 +44,11 @@ func main() {
 				continue
 			}
 
-			time.Sleep(30 * time.Second) // Wait for the sensor to warm up
+			time.Sleep(*warmup)
 
 			point, err := sensor.Query()
-
 			if err != nil {
 				log.Printf("failed to query sensor: %v", err)
-				continue
 			} else {
 				pm25Gauge.Set(point.PM25)
 				pm10Gauge.Set(point.PM10)
@@ -52,11 +59,11 @@ func main() {
 				log.Printf("failed to put sensor to sleep: %v", err)
 			}
 
-			time.Sleep(300 * time.Second) // Sleep for 5 minutes
+			time.Sleep(*interval)
 		}
 	}()
 
 	http.Handle("/metrics", promhttp.Handler())
-	log.Println("[particulate-exporter] Listening on :8000")
-	log.Fatal(http.ListenAndServe(":8000", nil))
+	log.Printf("[particulate-exporter] device=%s listen=%s", *device, *addr)
+	log.Fatal(http.ListenAndServe(*addr, nil))
 }
