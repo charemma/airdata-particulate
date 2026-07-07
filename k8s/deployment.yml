@@ -29,7 +29,7 @@ spec:
           effect: NoSchedule
       containers:
         - name: exporter
-          image: ghcr.io/charemma/airdata-particulate:latest
+          image: ghcr.io/charemma/particulate:latest
           imagePullPolicy: Always
           ports:
             - name: metrics

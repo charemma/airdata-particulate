@@ -36,4 +36,4 @@ jobs:
             --dest-username "$GHCR_USER" \
             --dest-password "$GHCR_TOKEN" \
             docker-archive:./result \
-            docker://ghcr.io/charemma/airdata-particulate:latest
+            docker://ghcr.io/charemma/particulate:latest
