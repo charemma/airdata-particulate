@@ -2,7 +2,7 @@
 
 Prometheus exporter for the **Nova PM SDS011** particulate matter sensor. Reads over a UART/USB serial link, exposes PM2.5 and PM10 concentrations at `/metrics`.
 
-**Live data:** [public grafana dashboard](https://monitoring.charemma.de/public-dashboards/e423bb338c5944a689d9a640e218317b)
+**Live data:** [public grafana dashboard](https://monitoring.charemma.de/public-dashboards/3f3e0fdc8d99483e907690354824eeb6)
 
 ## How the sensor works
 
