@@ -16,7 +16,11 @@ spec:
         app: airdata-particulate
     spec:
       nodeSelector:
+        # sensor-type pins the pod to a specific node (aiagent). The arch
+        # selector is a belt-and-suspenders: the image is arm64-only, so
+        # misapplying to an amd64 node would fail at container start.
         sensor-type: particulate
+        kubernetes.io/arch: arm64
       containers:
         - name: exporter
           image: ghcr.io/charemma/airdata-particulate:latest

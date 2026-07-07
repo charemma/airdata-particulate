@@ -1,43 +1,43 @@
 # airdata-particulate
 
-Prometheus exporter for the **Nova PM SDS011** particulate matter sensor. Runs on a Raspberry Pi 5 (aiagent), measures PM2.5 and PM10 concentrations, and exposes them at `/metrics` for Prometheus scraping.
+Prometheus exporter for the **Nova PM SDS011** particulate matter sensor. Reads over a UART/USB serial link, exposes PM2.5 and PM10 concentrations at `/metrics`.
 
-**Live data:** [monitoring.charemma.de/d/airdata-particulate](https://monitoring.charemma.de/d/airdata-particulate) (public read-only dashboard)
+**Live data:** [monitoring.charemma.de/d/airdata-particulate](https://monitoring.charemma.de/d/airdata-particulate)
 
 ## How the sensor works
 
-The SDS011 uses **laser scattering** to count and size particles in a flowing air stream. A small fan pulls ambient air past a 650nm laser diode; particles crossing the beam scatter light onto a photodetector. The pulse pattern is analysed to derive concentrations in two size classes:
+The SDS011 uses **laser scattering** to count and size particles in a flowing air stream. A small fan pulls ambient air past a 650 nm laser diode; particles crossing the beam scatter light onto a photodetector. Pulse patterns are analysed to derive concentrations in two size classes:
 
-- **PM2.5** -- particles up to 2.5 µm (fine particulate, penetrates deep into lungs and bloodstream). Sources: combustion, cooking, wood/tobacco smoke, wildfires.
-- **PM10** -- particles up to 10 µm (coarse particulate). Sources: pollen, road dust, mechanical wear, agriculture.
+- **PM2.5** -- particles up to 2.5 µm. Fine particulate; penetrates deep into lungs and bloodstream. Sources: combustion, cooking, wood/tobacco smoke, wildfires.
+- **PM10** -- particles up to 10 µm. Sources: pollen, road dust, mechanical wear, agriculture.
 
-Values are reported in **µg/m³** (micrograms per cubic metre). EU air quality thresholds (annual mean):
+Concentrations are reported in **µg/m³**. Reference thresholds (annual mean):
 
-| Metric | WHO 2021 guideline | EU limit |
-|--------|--------------------|----------|
-| PM2.5 | 5 µg/m³ | 25 µg/m³ (soon 10) |
-| PM10 | 15 µg/m³ | 40 µg/m³ (soon 20) |
+| | WHO 2021 guideline | EU limit |
+|--|--|--|
+| PM2.5 | 5 µg/m³ | 25 µg/m³ |
+| PM10 | 15 µg/m³ | 40 µg/m³ |
 
 ## Measurement cycle
 
-To extend sensor lifetime (rated ~8000h continuous, longer duty-cycled) the exporter wakes the sensor, takes one measurement, then sleeps it again:
+The SDS011 has a rated life of ~8000h continuous. To extend that, the exporter wakes the sensor, takes one measurement, then sleeps it:
 
 ```
 loop:
-  sensor.Awake()      # spin up fan and laser
+  sensor.Awake()
   sleep 30s            # warm-up: air flow stabilises
-  point = sensor.Query()   # returns pm25, pm10
+  point = sensor.Query()
   pm25Gauge.Set(point.PM25)
   pm10Gauge.Set(point.PM10)
-  sensor.Sleep()       # fan + laser off
-  sleep 300s           # 5 minute idle
+  sensor.Sleep()
+  sleep 300s           # idle
 ```
 
-Effective duty cycle: ~30s active / 5:00 min idle -> sensor life multiplies by ~10x compared with continuous operation.
+Effective duty cycle: ~30s active / 5:00 min idle -- extends sensor life ~10x.
 
 ## Metrics
 
-Both are gauges, unit µg/m³:
+Both gauges, unit µg/m³:
 
 ```
 # HELP pm25 PM2.5 concentration in µg/m³
@@ -48,35 +48,36 @@ pm25 12.3
 pm10 18.7
 ```
 
-## Build and run
+## Build
+
+Everything is driven by the flake. Enter a shell:
 
 ```bash
-go build -o particulate .
-./particulate                # needs SDS011 on /dev/ttyUSB0, prints readings to stdout
-curl localhost:8000/metrics
+nix develop
+go build -o particulate .   # native binary, quick edits
 ```
 
-Or via dagger:
+Or build the release binary directly:
 
 ```bash
-dagger call lint
-dagger call build            # multi-arch (linux/arm64) container image
+nix build .#default
+./result/bin/particulate    # exposes :8000/metrics; expects sensor on /dev/ttyUSB0
 ```
 
-CI publishes to `ghcr.io/charemma/airdata-particulate:latest` on every push to main.
+Container image (arm64):
+
+```bash
+nix build .#docker
+# result -> tarball; load into podman/docker or push with skopeo
+skopeo copy docker-archive:./result docker://ghcr.io/charemma/airdata-particulate:latest
+```
 
 ## Deployment
 
 Kubernetes manifests in `k8s/` are consumed by argocd via kustomize:
 
-- `deployment.yml` -- runs on any node labelled `sensor-type=particulate` (aiagent), privileged for USB device access, mounts `/dev/ttyUSB0` from host
+- `deployment.yml` -- privileged pod, mounts `/dev/ttyUSB0` from host, pinned via `sensor-type=particulate` and `kubernetes.io/arch=arm64`
 - `service.yml` + `servicemonitor.yml` -- prometheus-operator scrapes the exporter every 60s
-- `dashboard/particulate.json` -- Grafana dashboard, generated into a ConfigMap by kustomize and picked up by the grafana sidecar (label `grafana_dashboard=1`) so it appears in the "Air Quality" folder without manual import
+- `dashboard/particulate.json` -- Grafana dashboard, generated into a ConfigMap by kustomize and picked up by the grafana sidecar (label `grafana_dashboard=1`) so it appears in the "Air Quality" folder
 
 The argocd Application lives in [charemma/platform](https://github.com/charemma/platform) at `gitops/apps/particulate.yaml`.
-
-## Hardware
-
-- **Sensor:** Nova PM Sensor SDS011 (7-pin UART, USB adapter)
-- **Host:** Raspberry Pi 5 (aiagent), running NixOS
-- **Placement:** indoor, ground floor

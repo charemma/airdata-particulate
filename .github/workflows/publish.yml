@@ -1,0 +1,34 @@
+name: Publish container image
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@main
+
+      - name: Build image
+        run: nix build .#docker
+
+      - name: Push to GHCR
+        env:
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          nix run nixpkgs#skopeo -- copy \
+            --dest-username "$GHCR_USER" \
+            --dest-password "$GHCR_TOKEN" \
+            docker-archive:./result \
+            docker://ghcr.io/charemma/airdata-particulate:latest
