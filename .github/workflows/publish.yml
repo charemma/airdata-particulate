@@ -12,6 +12,9 @@ jobs:
       contents: read
       packages: write
 
+    env:
+      IMAGE: ghcr.io/charemma/particulate
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -19,10 +22,12 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/nix-installer-action@main
 
-      - name: Build image
-        run: nix build .#docker
+      - name: Build both arch images
+        run: |
+          nix build .#dockerAmd64 -o result-amd64
+          nix build .#dockerArm64 -o result-arm64
 
-      - name: Push to GHCR
+      - name: Push per-arch images and combine into a manifest list
         env:
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -32,8 +37,21 @@ jobs:
           sudo tee /etc/containers/registries.conf > /dev/null <<EOF
           unqualified-search-registries = ["docker.io"]
           EOF
-          nix run nixpkgs#skopeo -- copy \
-            --dest-username "$GHCR_USER" \
-            --dest-password "$GHCR_TOKEN" \
-            docker-archive:./result \
-            docker://ghcr.io/charemma/particulate:latest
+
+          for arch in amd64 arm64; do
+            nix run nixpkgs#skopeo -- copy \
+              --dest-username "$GHCR_USER" \
+              --dest-password "$GHCR_TOKEN" \
+              docker-archive:./result-$arch \
+              docker://$IMAGE:$arch
+          done
+
+          # Combine per-arch tags into a manifest list at :latest so the
+          # scheduler can pull the right variant on any node.
+          nix run nixpkgs#manifest-tool -- \
+            --username "$GHCR_USER" \
+            --password "$GHCR_TOKEN" \
+            push from-args \
+              --platforms linux/amd64,linux/arm64 \
+              --template $IMAGE:ARCH \
+              --target $IMAGE:latest
